@@ -54,19 +54,6 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
----
-
-## 📂 Project Structure
-
-\`\`\`text
-├── src/
-│   ├── app/                  # Next.js App Router (Layouts, pages, styles)
-│   └── shared/               # Shared components, providers, and API services
-├── public/                   # Static assets
-├── .env.example              # Environment variables template
-├── package.json              # Project dependencies & scripts
-└── README.md                 # Project documentation
-\`\`\`
 
 ---
 
