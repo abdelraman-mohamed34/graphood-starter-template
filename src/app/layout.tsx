@@ -27,7 +27,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Graphood Market",
-  description: "Multi-tenant E-Commerce Platform",
+  description: "Multi-tenant Platform",
 };
 
 export default async function RootLayout({
@@ -36,39 +36,45 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const headersList = await headers();
-  const host = headersList.get("host") || "";
 
-  const subdomain = host.split(".")[0];
-  const tenantSlug = process.env.NODE_ENV === "development" ? "sandbox" : subdomain;
+  const tenantSlug = headersList.get("x-tenant-slug") || "";
 
   const queryClient = getQueryClient();
 
-  const [tenantData] = await Promise.all([
-    queryClient.fetchQuery({
-      queryKey: graphoodQueryKeys.tenant(tenantSlug),
-      queryFn: () =>
-        getTenantDetails(tenantSlug, graphoodServerClient),
-    }),
+  let tenantData = null;
 
-    queryClient.prefetchQuery({
-      queryKey: graphoodQueryKeys.health,
-      queryFn: () =>
-        checkGraphoodHealth(graphoodServerClient),
-    }),
+  try {
+    const [tenantRes] = await Promise.all([
+      queryClient.fetchQuery({
+        queryKey: graphoodQueryKeys.tenant(tenantSlug),
+        queryFn: () => getTenantDetails(tenantSlug, graphoodServerClient),
+      }),
 
-    queryClient.prefetchQuery({
-      queryKey: graphoodQueryKeys.memberships(tenantSlug),
-      queryFn: () =>
-        getMemberships(tenantSlug, graphoodServerClient),
-    }),
-  ]);
+      queryClient.prefetchQuery({
+        queryKey: graphoodQueryKeys.health,
+        queryFn: () => checkGraphoodHealth(graphoodServerClient),
+      }),
+
+      queryClient.prefetchQuery({
+        queryKey: graphoodQueryKeys.memberships(tenantSlug),
+        queryFn: () => getMemberships(tenantSlug, graphoodServerClient),
+      }),
+    ]);
+
+    tenantData = tenantRes;
+  } catch (error) {
+    console.error("[Tenant Resolution Error]:", error);
+  }
 
   const dehydratedState = dehydrate(queryClient);
-  const tenant = tenantData.data.tenant;
 
-  const isValidTenant =
-    tenantData.success &&
-    tenant.status === "ACTIVE";
+  const tenant = tenantData?.data?.tenant || (tenantData?.data as any);
+
+  const isValidTenant = Boolean(
+    tenantData?.success &&
+    tenant?.id &&
+    tenant?.status === "ACTIVE"
+  );
 
   return (
     <html
@@ -77,18 +83,13 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {isValidTenant ? (
-          <Providers
-            dehydratedState={dehydratedState}
-          >
+          <Providers dehydratedState={dehydratedState} tenantSlug={tenantSlug}>
             {children}
           </Providers>
         ) : (
           <div className="flex min-h-screen w-full items-center justify-center bg-gray-50 text-slate-800">
             <div className="text-center dir-rtl">
-              <h1 className="text-6xl font-extrabold text-slate-900">
-                404
-              </h1>
-
+              <h1 className="text-6xl font-extrabold text-slate-900">404</h1>
               <p className="mt-4 text-xl font-medium">
                 المتجر غير موجود أو غير مفعل حالياً.
               </p>
