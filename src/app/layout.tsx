@@ -38,37 +38,48 @@ export default async function RootLayout({
   const headersList = await headers();
 
   const tenantSlug = headersList.get("x-tenant-slug") || "";
+  const demoTenantSlug = process.env.NEXT_PUBLIC_DEMO_TENANT_SLUG || "sandbox";
 
   const queryClient = getQueryClient();
 
   let tenantData = null;
+  let resolvedTenantSlug = tenantSlug;
+  let isDemoMode = false;
 
   try {
-    const [tenantRes] = await Promise.all([
-      queryClient.fetchQuery({
-        queryKey: graphoodQueryKeys.tenant(tenantSlug),
-        queryFn: () => getTenantDetails(tenantSlug, graphoodServerClient),
-      }),
+    tenantData = await queryClient.fetchQuery({
+      queryKey: graphoodQueryKeys.tenant(tenantSlug),
+      queryFn: () => getTenantDetails(tenantSlug, graphoodServerClient),
+    });
+  } catch {
+    console.warn(`[Tenant Resolution] "${tenantSlug}" was not found; using demo tenant.`);
 
-      queryClient.prefetchQuery({
-        queryKey: graphoodQueryKeys.health,
-        queryFn: () => checkGraphoodHealth(graphoodServerClient),
-      }),
-
-      queryClient.prefetchQuery({
-        queryKey: graphoodQueryKeys.memberships(tenantSlug),
-        queryFn: () => getMemberships(tenantSlug, graphoodServerClient),
-      }),
-    ]);
-
-    tenantData = tenantRes;
-  } catch (error) {
-    console.error("[Tenant Resolution Error]:", error);
+    try {
+      resolvedTenantSlug = demoTenantSlug;
+      isDemoMode = true;
+      tenantData = await queryClient.fetchQuery({
+        queryKey: graphoodQueryKeys.tenant(demoTenantSlug),
+        queryFn: () => getTenantDetails(demoTenantSlug, graphoodServerClient),
+      });
+    } catch (demoError) {
+      console.error("[Demo Tenant Resolution Error]:", demoError);
+    }
   }
+
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: graphoodQueryKeys.health,
+      queryFn: () => checkGraphoodHealth(graphoodServerClient),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: graphoodQueryKeys.memberships(resolvedTenantSlug),
+      queryFn: () => getMemberships(resolvedTenantSlug, graphoodServerClient),
+    }),
+  ]);
 
   const dehydratedState = dehydrate(queryClient);
 
-  const tenant = tenantData?.data?.tenant || (tenantData?.data as any);
+  const tenant = tenantData?.data.tenant;
 
   const isValidTenant = Boolean(
     tenantData?.success &&
@@ -83,7 +94,16 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {isValidTenant ? (
-          <Providers dehydratedState={dehydratedState} tenantSlug={tenantSlug}>
+          <Providers dehydratedState={dehydratedState} tenantSlug={resolvedTenantSlug}>
+            {isDemoMode && (
+              <div
+                role="status"
+                dir="rtl"
+                className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-950"
+              >
+                أنت الآن في البيئة التجريبية لأن المتجر «{tenantSlug}» غير موجود.
+              </div>
+            )}
             {children}
           </Providers>
         ) : (

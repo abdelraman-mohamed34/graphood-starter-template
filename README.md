@@ -54,6 +54,13 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+For a tenant subdomain on the same machine, open `http://sandbox.localhost:3000`.
+To test from another device, start Next.js with `npm run dev -- --hostname 0.0.0.0`
+and open `http://<YOUR-LAN-IP>:3000`. `localhost` always points to the device that
+opens the URL, so `sandbox.localhost` cannot address your development computer from
+another phone or computer. Add a LAN DNS/hosts entry if you specifically need a
+subdomain while testing across devices.
+
 
 ---
 

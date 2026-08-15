@@ -11,7 +11,7 @@ export default function Home() {
 
   return (
     <main className="">
-      Welcome
+      Welcome {tenant?.data.tenant.name}
     </main>
   );
 }
